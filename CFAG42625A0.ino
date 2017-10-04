@@ -94,7 +94,7 @@ typedef enum {
 //  #9/D9     |  PB1 | LCD_CS
 // #10/D10    |  PB2 | DAC_CS
 // #11/D11    |  PB3 | HW_MOSI    (hardware SPI)
-// #12/D12    |  PB4 | not used   (would be hardware MISO)
+// #12/D12    |  PB4 | not used   (hardware MISO)
 // #13/D13    |  PB5 | HW_SCK     (hardware SPI)
 
 // A0 = LCD_A0

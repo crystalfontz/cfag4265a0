@@ -35,28 +35,12 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 //=============================================================================
+#include <Arduino.h>
 #include <SPI.h>
-
-#define ARDUINO_SPI 1
-
+#include "LTC2630.h"
 #include "CFAG4265A0_logo.h"
 //-----------------------------------------------------------------------------
 
-// Backlight full on at DAC output = 1.5V
-// Backlight off at DAC output < 50mV
-#define BACKLIGHT_FULL_ON 232
-#define BACKLIGHT_FULL_OFF 0
-
-typedef enum {
-  DAC_REG_WRITE = 0b00000000,
-  DAC_REG_UPDATE = 0b00010000,
-  DAC_REG_WRITE_UPDATE = 0b00110000,
-  DAC_POWER_DOWN = 0b01000000,
-  DAC_INTERNAL_REF = 0b01100000,
-  DAC_VCC_REF = 0b01110000,
-} dac_cmd_t;
-
-// LTC2630-8 DAC Commands
 
 // ST7565P LCD Controller Definitions
 #define LCD_BIAS_1_7 1
@@ -107,11 +91,6 @@ typedef enum {
 #define CLR_LCD_CS    (PORTB &= ~(LCD_CS))
 #define SET_LCD_CS    (PORTB |= (LCD_CS))
 
-// CS2 = DAC_CS
-#define DAC_CS 0x04
-#define CLR_DAC_CS    (PORTB &= ~(DAC_CS))
-#define SET_DAC_CS    (PORTB |= (DAC_CS))
-
 // MOSI
 // #define HW_MOSI 0x08
 // #define CLR_MOSI    (PORTB &= ~(HW_MOSI))
@@ -136,15 +115,10 @@ typedef enum {
 //=============================================================================
 // Function Prototypes
 //-----------------------------------------------------------------------------
-void dac_init(void);
-void dac_cmd_send(dac_cmd_t cmd, uint8_t data);
+LTC2630 dac;
 
-void gpio_init(void);
-
-void hw_reset(void);
 
 void lcd_backlight_cycle(void);
-void lcd_backlight_set(uint8_t light);
 void lcd_clear(void);
 void lcd_column_address_set(uint8_t column);
 void lcd_init(void);
@@ -166,57 +140,16 @@ void lcd_electronic_volume_set(uint8_t contrast);
 void lcd_vo_regulator_resistor_set(uint8_t ratio);
 void lcd_booster_ratio_set(uint8_t ratio);
 
-void spi_init(void);
 void spi_master_send_byte(uint8_t data);
 
 //=============================================================================
-void gpio_init(void)
-{
-  //SEE #defines above
-  DDRB |= 0x47;
-  DDRD |= 0x80;
-
-  //Drive the ports to a reasonable starting state.
-  SET_LCD_CS;
-  SET_DAC_CS;
-  CLR_LCD_A0;
-  SET_RESET;
-}
-//=============================================================================
-#if ARDUINO_SPI == 0
-
-void spi_init(void)
-{
-  /* Initialize SPI as master sck = fck/16, data clocked on rising
-      * edge. The SPI clock may be set as high as 20MHz for the
-      * ST7565P LCD controller on the CFAO4265.
-      */
-  SPCR = (1 << SPE) | (1 << MSTR) | (1 << SPR0);
-}
-
-void spi_master_send_byte(uint8_t data)
-{
-  /* Start data transmission
-      */
-  SPDR = data;
-
-  /* Wait for transmission complete
-      */
-  while (!(SPSR & (1 << SPIF)));
-}
-#endif
-
 void lcd_cmd_send(uint8_t data)
 {
   // Set LCD_CS low and LCD_A0 low to indicate command to LCD Send
   //  command byte to LCD
   CLR_LCD_CS;
   CLR_LCD_A0;
-#if ARDUINO_SPI == 1
   SPI.transfer(data);
-#else
-  spi_master_send_byte(data);
-#endif
   delay(1);
 
   // Set LCD_CS high and LCD_A0 high again
@@ -230,11 +163,7 @@ void lcd_data_send(uint8_t data)
   CLR_LCD_CS;
   SET_LCD_A0;
   //Send data byte to LCD
-#if ARDUINO_SPI == 1
   SPI.transfer(data);
-#else
-  spi_master_send_byte(data);
-#endif
   delay(1);
 
   // Set LCD_CS high and LCD_A0 high again
@@ -373,76 +302,6 @@ void lcd_fill(uint8_t data, uint16_t delay_ms_col, uint16_t delay_ms_page)
     delay(delay_ms_page);
   }
 }
-
-void lcd_backlight_set(uint8_t light)
-{
-  dac_cmd_send(DAC_REG_WRITE_UPDATE, light);
-}
-
-void lcd_backlight_cycle(void)
-{
-  uint8_t light_val;
-
-  /* Decrease backlight from full brightness to almost off
-      */
-  for (light_val = BACKLIGHT_FULL_ON; light_val > BACKLIGHT_FULL_OFF; --light_val)
-  {
-    lcd_backlight_set(light_val);
-    _delay_ms(40);
-  }
-
-  /* Leave backlight off for 1S
-	  */
-  delay(1000);
-
-  /* Increase backlight from off to almost full brightness
-      */
-  for (light_val = BACKLIGHT_FULL_OFF; light_val < BACKLIGHT_FULL_ON; ++light_val)
-  {
-    lcd_backlight_set(light_val);
-    _delay_ms(40);
-  }
-}
-//=============================================================================
-void dac_init(void)
-{
-  // Initialize the LTC2630-8 DAC. Set its reference to VCC
-  // (+3.3VDC)
-//  Serial.println(F("cmd1"));
-  dac_cmd_send(DAC_POWER_DOWN, NULL_DATA);
-//  Serial.println(F("cmd2"));
-  dac_cmd_send(DAC_VCC_REF, NULL_DATA);
-}
-//=============================================================================
-void dac_cmd_send(dac_cmd_t cmd, uint8_t data)
-{
-  /* Set DAC_CS low. Send DAC command, data byte followed by don't
-      * care byte to DAC
-      */
-//  Serial.println(F("entering dac_cmd_send()"));
-      
-  CLR_DAC_CS;
-#if ARDUINO_SPI == 1
-  SPI.transfer(cmd);
-  delay(1);
-  SPI.transfer(data);
-  delay(1);
-  SPI.transfer(NULL_DATA);
-  delay(1);
-#else
-  spi_master_send_byte(cmd);
-  delay(1);
-  spi_master_send_byte(data);
-  delay(1);
-  spi_master_send_byte(NULL_DATA);
-  delay(1);
-  #endif  
-
-  /* Set DAC_CS high
-      */
-  SET_DAC_CS;
-//  Serial.println(F("exiting dac_cmd_send()"));
-}
 //=============================================================================
 //=============================================================================
 //=============================================================================
@@ -454,17 +313,6 @@ void dac_cmd_send(dac_cmd_t cmd, uint8_t data)
 //=============================================================================
 //=============================================================================
 //=============================================================================
-void hw_reset(void)
-{
-  /* Set the LCD_RST low for 10 uS and then high again and return
-      * after 10 uS. According to the ST7565P datasheet only 1 uS is
-      * needed at VDD = 3.3VDC but it won't hurt to be conservative.
-      */
-  CLR_RESET;
-  _delay_us(10);
-  SET_RESET;
-  _delay_us(10);
-}
 //=============================================================================
 void setup(void)
 {
@@ -475,28 +323,36 @@ void setup(void)
   Serial.println(F("Entering setup()"));
 
   //Thump the reset
-  hw_reset();
+  // Set the LCD_RST low for 10 uS and then high again and return
+  // after 10 uS. According to the ST7565P datasheet only 1 uS is
+  // needed at VDD = 3.3VDC but it won't hurt to be conservative.
+  CLR_RESET;
+  _delay_us(10);
+  SET_RESET;
+  _delay_us(10);
 
-  // Initialize the individual pieces
-  Serial.println(F("gpio_init()"));
-  gpio_init();
-#if ARDUINO_SPI == 1
-  // // Initialize SPI. By default the clock is 4MHz.
+  // Set the ports to the appropriate I/O modes
+  DDRB |= 0x47;
+  DDRD |= 0x80;
+
+  // Set the pins to a reasonable starting state.
+  SET_LCD_CS;
+  SET_DAC_CS;
+  CLR_LCD_A0;
+  SET_RESET;
+
+  // Initialize SPI. By default the clock is 4MHz.
   SPI.begin();
-  // //Bump the clock to 8MHz. Appears to be the maximum.
+  //Bump the clock to 8MHz. Appears to be the maximum.
   SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
-#else
-  Serial.println(F("spi_init()"));
-  spi_init();
-#endif
-  Serial.println(F("dac_init()"));
-  dac_init();
-  Serial.println(F("lcd_init()"));
+  
+  dac.init();
+  
   lcd_init();
 
   // Turn on the display and its backlight
   lcd_display_on();
-  lcd_backlight_set(BACKLIGHT_FULL_ON);
+  dac.backlight_set(BACKLIGHT_FULL_ON);
 }
 //=============================================================================
 void loop(void)

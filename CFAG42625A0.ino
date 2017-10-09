@@ -56,6 +56,9 @@ void setup(void)
   Serial.begin(115200);
   Serial.println(F("Entering setup()"));
 
+  // Set the ports to the appropriate I/O modes
+  DDRB |= 0x7F;
+  
   //Thump the reset
   // Set the LCD_RST low for 10 uS and then high again and return
   // after 10 uS. According to the ST7565P datasheet only 1 uS is
@@ -64,10 +67,6 @@ void setup(void)
   _delay_us(10);
   SET_RESET;
   _delay_us(10);
-
-  // Set the ports to the appropriate I/O modes
-  DDRB |= 0x47;
-  DDRD |= 0x80;
 
   // Set the pins to a reasonable starting state.
   SET_LCD_CS;

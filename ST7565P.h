@@ -31,21 +31,21 @@
 //=============================================================================
 // LCD SPI & control lines
 //-----------------------------------------------------------------------------
-//   ARD      | Port | LCD
-// -----------+------+-------------------------
-//  #8/D8     |  PB0 | LCD_A0
-//  #9/D9     |  PB1 | LCD_CS
-// #10/D10    |  PB2 | DAC_CS
-// #11/D11    |  PB3 | HW_MOSI    (hardware SPI)
-// #12/D12    |  PB4 | not used   (hardware MISO)
-// #13/D13    |  PB5 | HW_SCK     (hardware SPI)
+//   ARD      | Port | LCD                      | Wire Color
+// -----------+------+--------------------------+-----------
+//  #8/D8     |  PB0 | LCD_A0                   | Green
+//  #9/D9     |  PB1 | LCD_CS                   | Purple
+// #10/D10    |  PB2 | DAC_CS                   | Red
+// #11/D11    |  PB3 | HW_MOSI  (hardware SPI)  | Orange
+// #12/D12    |  PB4 | LCD_RST  (hardware MISO) | Blue
+// #13/D13    |  PB5 | HW_SCK   (hardware SPI)  | Yellow
 
-// A0 = LCD_A0
+// A0 = LCD_A0 | GREEN
 #define LCD_A0 0x01
 #define CLR_LCD_A0    (PORTB &= ~(LCD_A0))
 #define SET_LCD_A0    (PORTB |= (LCD_A0))
 
-// CS1 = LCD_CS
+// CS1 = LCD_CS | PURPLE
 #define LCD_CS 0x02
 #define CLR_LCD_CS    (PORTB &= ~(LCD_CS))
 #define SET_LCD_CS    (PORTB |= (LCD_CS))
@@ -55,7 +55,12 @@
 // #define CLR_MOSI    (PORTB &= ~(HW_MOSI))
 // #define SET_MOSI    (PORTB |= (HW_MOSI))
 
-// MISO
+// HW_RESET | BLUE
+#define HW_RESET 0x10
+#define CLR_RESET    (PORTB &= ~(HW_RESET))
+#define SET_RESET    (PORTB |= (HW_RESET))
+
+// MISO | UNUSED
 // #define HW_MISO 0x10
 // #define CLR_MISO    (PORTB &= ~(HW_MISO))
 // #define SET_MISO    (PORTB |= (HW_MISO))
@@ -64,11 +69,6 @@
 // #define HW_SCK 0x20
 // #define CLR_SCK    (PORTB &= ~(HW_SCK))
 // #define SET_SCK    (PORTB |= (HW_SCK))
-
-// HW_RESET
-#define HW_RESET 0x80
-#define CLR_RESET    (PORTD &= ~(HW_RESET))
-#define SET_RESET    (PORTD |= (HW_RESET))
 
 #define NULL_DATA 0
 
